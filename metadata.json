@@ -1,0 +1,7 @@
+{
+  "name": "AdGenius AI - Product Ad Generator",
+  "description": "Create professional product advertisements for Facebook, Instagram, and TikTok using Gemini AI. Upload your product photo and describe the atmosphere to generate high-quality marketing visuals instantly.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
