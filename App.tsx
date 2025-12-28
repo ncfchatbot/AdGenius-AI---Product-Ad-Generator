@@ -1,461 +1,374 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout.tsx';
-import { Platform, AspectRatio, ProductCategory, AdConfiguration, BagColor, PostObjective } from './types.ts';
-import { generateProductAd, generateBrandIdentity, GenerationOutput, BrandIdentityOutput } from './services/geminiService.ts';
+import { Platform, AspectRatio, ProductCategory, AdConfiguration, BagColor } from './types.ts';
+import { generateProductAd, generateLabelDesign, generateBrandStrategy } from './services/geminiService.ts';
 import { translations, Language } from './translations.ts';
 
-const FREE_LIMIT = 10;
-const ADMIN_PHONE = "8562076059085";
-
-interface BagStyle {
-  bg: string;
-  type: 'kraft' | 'matte' | 'glossy' | 'metallic' | 'clear';
-}
-
-const BAG_STYLES: Record<BagColor, BagStyle> = {
-  [BagColor.C001]: { bg: 'linear-gradient(165deg, #e4cfb1 0%, #d2b48c 50%, #c4a478 100%)', type: 'kraft' },
-  [BagColor.C002]: { bg: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)', type: 'clear' },
-  [BagColor.C003]: { bg: 'linear-gradient(135deg, #d4af37 0%, #fff1b8 40%, #b8860b 100%)', type: 'metallic' },
-  [BagColor.C004]: { bg: 'linear-gradient(135deg, #e0e0e0 0%, #ffffff 40%, #a0a0a0 100%)', type: 'metallic' },
-  [BagColor.C005]: { bg: 'radial-gradient(circle at 35% 35%, #444, #000)', type: 'glossy' },
-  [BagColor.C006]: { bg: 'radial-gradient(circle at 35% 35%, #fff, #eee)', type: 'glossy' },
-  [BagColor.C007]: { bg: 'linear-gradient(180deg, #333 0%, #111 100%)', type: 'matte' },
-  [BagColor.C008]: { bg: 'linear-gradient(180deg, #5d4037 0%, #3e2723 100%)', type: 'matte' },
-  [BagColor.C009]: { bg: 'linear-gradient(180deg, #00838f 0%, #004d40 100%)', type: 'matte' },
-  [BagColor.C010]: { bg: 'linear-gradient(180deg, #388e3c 0%, #1b5e20 100%)', type: 'matte' },
-  [BagColor.C011]: { bg: 'linear-gradient(180deg, #283593 0%, #1a237e 100%)', type: 'matte' },
-  [BagColor.C012]: { bg: 'radial-gradient(circle at 35% 35%, #4fc3f7, #0288d1)', type: 'glossy' },
-  [BagColor.C013]: { bg: 'radial-gradient(circle at 35% 35%, #ff5252, #b71c1c)', type: 'glossy' },
-};
-
-const CoffeeBagIcon = ({ colorKey, isSelected }: { colorKey: BagColor, isSelected: boolean }) => {
-  const style = BAG_STYLES[colorKey];
-  const label = colorKey.split(' ')[0];
-
-  return (
-    <div className={`flex flex-col items-center group cursor-pointer transition-all duration-300 ${isSelected ? 'scale-110' : 'opacity-75 hover:opacity-100'}`}>
-      <div 
-        className={`w-12 h-18 sm:w-14 sm:h-20 rounded-t-md rounded-b-xl relative shadow-2xl overflow-hidden border transition-all ${isSelected ? 'ring-4 ring-[#6F4E37] ring-offset-2 border-transparent' : 'border-black/5'}`}
-        style={{ background: style.bg }}
-      >
-        {/* Specular Highlights & Texture */}
-        {style.type === 'kraft' && (
-          <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/cardboard-flat.png")' }} />
-        )}
-        {(style.type === 'glossy' || style.type === 'metallic') && (
-          <div className="absolute top-0 left-[-100%] w-[300%] h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-25 animate-pulse pointer-events-none" />
-        )}
-        {style.type === 'clear' && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-8 h-10 bg-amber-900/10 blur-lg rounded-full" />
-            <div className="absolute inset-0 bg-white/10 backdrop-blur-[3px]" />
-          </div>
-        )}
-
-        {/* Realistic Sealing Detail */}
-        <div className="absolute top-0 left-0 w-full h-5 bg-black/5 flex flex-col justify-center space-y-[2px] px-1 border-b border-black/5">
-          {[1, 2, 3].map(i => <div key={i} className="w-full h-[0.5px] bg-white/10" />)}
-        </div>
-
-        {/* Degassing Valve with Shadow */}
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-black/20 border border-white/5 shadow-inner flex items-center justify-center">
-          <div className="w-1.5 h-1.5 bg-black/40 rounded-full" />
-        </div>
-
-        {/* Side Gusset Reflection */}
-        <div className="absolute right-0 top-0 h-full w-[3px] bg-black/10" />
-        <div className="absolute left-0 top-0 h-full w-[1px] bg-white/5" />
-      </div>
-      <span className={`text-[10px] font-black mt-2 tracking-tighter ${isSelected ? 'text-[#3E2723]' : 'text-[#6F4E37]/50'}`}>{label}</span>
-    </div>
-  );
-};
+const LOGO_FILE = "logo.png";
+const FALLBACK_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233E2723'%3E%3Cpath d='M2 21h18v-2H2M20 8h-2V5h2m0-2H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z'/%3E%3C/svg%3E";
+const ADMIN_WHATSAPP = "8562076059085"; 
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('th');
-  const [userName, setUserName] = useState<string>('');
-  const [partnerId, setPartnerId] = useState<string>('');
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
-  const [showStep2, setShowStep2] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'ad' | 'brand' | 'calc'>('ad');
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [authStep, setAuthStep] = useState<'register' | 'login'>('register');
+  const [activeTab, setActiveTab] = useState<'ad' | 'label' | 'brand'>('ad');
   
-  const [brandConcept, setBrandConcept] = useState('');
-  const [selectedBagColor, setSelectedBagColor] = useState<BagColor>(BagColor.C005);
-  const [isBranding, setIsBranding] = useState(false);
-  const [brandResult, setBrandResult] = useState<BrandIdentityOutput | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
+  // ข้อมูลโปรไฟล์ที่ต้องบันทึก
+  const [regData, setRegData] = useState({ 
+    name: '', 
+    phone: '', 
+    address: '', 
+    facebook: '', 
+    whatsapp: '' 
+  });
+  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  const t = translations[lang];
+  const adFileInputRef = useRef<HTMLInputElement>(null);
+  const labelLogoInputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
-  const [config, setConfig] = useState<AdConfiguration>({
-    platform: Platform.FACEBOOK,
+  // --- AD STATE ---
+  const [adConfig, setAdConfig] = useState<AdConfiguration>({
+    platform: Platform.FACEBOOK, 
     aspectRatio: AspectRatio.SQUARE,
-    category: ProductCategory.PACKAGING,
-    objective: PostObjective.TASTE_QUALITY,
-    coffeeDetails: '',
-    atmosphere: '',
+    category: ProductCategory.PACKAGING, 
+    objective: translations[lang].objTaste || 'Taste',
+    coffeeDetails: '', 
+    atmosphere: '', 
     image: null,
   });
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [result, setResult] = useState<GenerationOutput | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [adResult, setAdResult] = useState<{imageUrl: string, caption: string} | null>(null);
 
-  const [beanPrice, setBeanPrice] = useState<number>(0);
-  const [targetWeight, setTargetWeight] = useState<number>(250);
-  const [packagingCost, setPackagingCost] = useState<number>(0);
-  const [otherLabor, setOtherLabor] = useState<number>(0);
+  // --- LABEL STATE ---
+  const [labelLogo, setLabelLogo] = useState<string | null>(null);
+  const [labelConcept, setLabelConcept] = useState('');
+  const [prodType, setProdType] = useState<'sticker' | 'print'>('sticker');
+  const [labelShape, setLabelShape] = useState<'rect' | 'circle' | 'square'>('rect');
+  const [selectedBagColor, setSelectedBagColor] = useState<BagColor>(BagColor.C007);
+  const [labelImageUrl, setLabelImageUrl] = useState('');
 
-  const t = translations[lang];
+  // --- BRAND/LOGO STATE ---
+  const [brandNameInput, setBrandNameInput] = useState('');
+  const [brandStyleInput, setBrandStyleInput] = useState('');
+  const [brandStrategy, setBrandStrategy] = useState<any>(null);
 
+  // โหลดข้อมูลจาก localStorage เมื่อเปิดแอป
   useEffect(() => {
-    const storedId = localStorage.getItem('coffee_uid');
-    if (storedId) {
-      setPartnerId(storedId);
-      setIsRegistered(true);
+    const savedProfile = localStorage.getItem('coffee_partner_profile');
+    if (savedProfile) {
+      const data = JSON.parse(savedProfile);
+      setRegData(data);
+      // หากมีข้อมูลครบถ้วน ให้ถือว่าลงทะเบียนแล้ว
+      if (data.name && data.phone && data.address) {
+        setIsRegistered(true);
+      }
     }
   }, []);
 
-  const costPerUnit = (beanPrice > 0) ? ((beanPrice / 1000) * targetWeight) + packagingCost + otherLabor : 0;
+  const checkApiKey = async () => {
+    // @ts-ignore
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+      // @ts-ignore
+      await window.aistudio.openSelectKey();
+    }
+    return true;
+  };
 
-  const handleRegister = () => {
-    if (!userName.trim()) {
-      setLoginError(t.labelName);
+  const handleSaveAndSend = () => {
+    const { name, phone, address, facebook, whatsapp } = regData;
+    if (!name || !phone || !address || !facebook || !whatsapp) {
+      setError(lang === 'th' ? "กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง" : "ກະລຸນາກອກຂໍ້ມູນໃຫ້ຄົບຖ້ວນທຸກຊ່ອງ");
       return;
     }
-    setLoginError(null);
-    const newId = 'CP-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    setPartnerId(newId);
-    setShowStep2(true);
-  };
-
-  const downloadImage = (url: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleBrandIdentity = async () => {
-    if (!brandConcept) return;
-    setIsBranding(true);
+    
+    // บันทึกลงเครื่อง
+    localStorage.setItem('coffee_partner_profile', JSON.stringify(regData));
+    
+    // ส่งไป WhatsApp Admin
+    const message = encodeURIComponent(`🔔 [ลงทะเบียนพาร์ทเนอร์ใหม่]\n👤 ชื่อ: ${name}\n📞 เบอร์โทร: ${phone}\n📍 ที่อยู่: ${address}\n🌐 FB: ${facebook}\n💬 WhatsApp: ${whatsapp}`);
+    window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${message}`, '_blank');
+    
+    setIsRegistered(true);
     setError(null);
-    try {
-      const res = await generateBrandIdentity(brandConcept, selectedBagColor, lang);
-      setBrandResult(res);
-    } catch (e) {
-      setError("การสื่อสารกับ AI ขัดข้อง กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsBranding(false);
-    }
   };
 
   const handleGenerateAd = async () => {
-    if (usageCount >= FREE_LIMIT) {
-      setError(t.limitReached);
+    if (!adConfig.image) {
+      setError(lang === 'th' ? "กรุณาอัปโหลดรูปภาพสินค้าจริง" : "ກະລຸນາອັບໂຫຼດຮູບພາບສິນຄ້າຈິງ");
       return;
     }
-    if (!config.image || !config.coffeeDetails) {
-      setError("กรุณาอัปโหลดรูปภาพและระบุรายละเอียดก่อนกดสร้าง");
-      return;
-    }
-    setIsGenerating(true);
+    setLoading(true);
     setError(null);
     try {
-      const output = await generateProductAd(config, lang);
-      setResult(output);
-      setUsageCount(prev => prev + 1);
-    } catch (err: any) {
-      setError("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsGenerating(false);
+      await checkApiKey();
+      const res = await generateProductAd(adConfig, lang);
+      setAdResult(res);
+      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  const handleGenerateLabel = async () => {
+    if (!labelConcept.trim()) {
+      setError(lang === 'th' ? "กรุณากรอกสไตล์งานออกแบบ" : "ກະລຸນາກອກສະໄຕລ໌ງານອອກແບບ");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await checkApiKey();
+      const res = await generateLabelDesign(
+        labelConcept, 
+        labelShape, 
+        selectedBagColor, 
+        prodType, 
+        lang,
+        labelLogo
+      );
+      setLabelImageUrl(res.imageUrl);
+      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  const handleGenerateBrand = async () => {
+    if (!brandStyleInput.trim()) {
+      setError(lang === 'th' ? "กรุณากรอกรายละเอียดสไตล์ LOGO" : "ກະລຸນາກອກລາຍລະອຽດສະໄຕລ໌ LOGO");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await checkApiKey();
+      const res = await generateBrandStrategy(brandNameInput, brandStyleInput, lang);
+      setBrandStrategy(res);
+      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setter(reader.result as string);
+      reader.readAsDataURL(file);
     }
   };
 
   if (!isRegistered) {
     return (
-      <div className="min-h-screen bg-[#FDF8F3] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl p-10 border border-[#E8D9CF]">
-          {!showStep2 ? (
-            <div className="space-y-8 text-center animate-in fade-in zoom-in duration-300">
-              <div className="w-20 h-20 bg-[#3E2723] text-white rounded-[2.2rem] flex items-center justify-center mx-auto mb-6 shadow-xl">
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h1 className="text-3xl font-black text-[#3E2723] tracking-tighter">COFFEE PLEASE</h1>
-              <p className="text-[#6F4E37]/60 text-sm font-bold uppercase tracking-widest">{t.regSubtitle}</p>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <input 
-                    type="text" 
-                    placeholder={t.labelName} 
-                    className={`w-full p-5 bg-[#FDF8F3] border rounded-2xl transition-all font-bold text-center focus:ring-2 focus:ring-[#6F4E37] outline-none ${loginError ? 'border-red-400' : 'border-transparent'}`} 
-                    value={userName}
-                    onChange={e => {
-                      setUserName(e.target.value);
-                      if (loginError) setLoginError(null);
-                    }} 
-                  />
-                  {loginError && <p className="text-red-500 text-xs font-bold">{loginError}</p>}
-                </div>
-                <button onClick={handleRegister} className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-black transition-all uppercase">{t.regSubmit}</button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center space-y-8 animate-in slide-in-from-right duration-300">
-              <h2 className="text-2xl font-black text-[#3E2723] uppercase">{t.regStep2Title}</h2>
-              <div className="bg-[#FDF8F3] p-8 rounded-[2rem] border-2 border-dashed border-[#E8D9CF] font-mono text-3xl font-black text-[#6F4E37] tracking-wider">
-                {partnerId}
-              </div>
-              <p className="text-xs text-[#6F4E37]/60 font-bold px-4">บันทึกรหัสพาร์ทเนอร์นี้เพื่อใช้ในครั้งถัดไป</p>
-              <button 
-                onClick={() => {
-                  localStorage.setItem('coffee_uid', partnerId);
-                  setIsRegistered(true);
-                }} 
-                className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all shadow-lg"
-              >
-                {t.btnStartApp}
-              </button>
-            </div>
-          )}
+      <div className="min-h-screen bg-[#FDF8F3] flex items-center justify-center p-6 text-slate-900">
+        <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 border border-[#E8D9CF]">
+          <div className="text-center mb-8">
+            <img src={LOGO_FILE} alt="Logo" className="w-20 h-20 mx-auto mb-4 object-contain" onError={(e) => e.currentTarget.src = FALLBACK_LOGO} />
+            <h1 className="text-2xl font-black text-[#3E2723] uppercase">COFFEE PLEASE</h1>
+            <p className="text-[10px] font-bold text-[#8D3B24] uppercase tracking-[0.3em]">{t.regSubtitle}</p>
+          </div>
+          
+          {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100">{error}</div>}
+          
+          <div className="space-y-4">
+            <input type="text" placeholder={t.labelName} value={regData.name} className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none font-bold" onChange={e => setRegData({...regData, name: e.target.value})} />
+            <input type="tel" placeholder={t.labelPhone} value={regData.phone} className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none font-bold" onChange={e => setRegData({...regData, phone: e.target.value})} />
+            <textarea placeholder={t.labelAddress} value={regData.address} className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none font-bold min-h-[80px]" onChange={e => setRegData({...regData, address: e.target.value})} />
+            <input type="text" placeholder="Facebook / Page" value={regData.facebook} className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none font-bold" onChange={e => setRegData({...regData, facebook: e.target.value})} />
+            <input type="text" placeholder="WhatsApp" value={regData.whatsapp} className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none font-bold" onChange={e => setRegData({...regData, whatsapp: e.target.value})} />
+            
+            <button onClick={handleSaveAndSend} className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#2d1b19] transition-colors shadow-lg">
+              {t.regSubmit}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <Layout lang={lang} setLang={setLang} onOpenKey={() => {}}>
-      <div className="max-w-5xl mx-auto px-4 mt-8">
-        <div className="bg-white p-2 rounded-2xl border border-[#E8D9CF] flex shadow-md overflow-hidden">
-          {['ad', 'brand', 'calc'].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-[#3E2723] text-white shadow-lg' : 'text-[#6F4E37]/30 hover:text-[#6F4E37]'}`}>
-              {tab === 'ad' ? t.tabAd : tab === 'brand' ? t.tabBrand : t.tabCalc}
+    <Layout lang={lang} setLang={setLang} onOpenKey={() => window.aistudio?.openSelectKey?.()}>
+      <div className="flex justify-center mb-10">
+        <div className="inline-flex bg-white p-1.5 rounded-2xl border border-[#E8D9CF] shadow-sm overflow-hidden">
+          {(['ad', 'label', 'brand'] as const).map((tab) => (
+            <button 
+              key={tab} 
+              onClick={() => setActiveTab(tab)} 
+              className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-[#3E2723] text-white shadow-md' : 'text-[#6F4E37]/40 hover:text-[#3E2723]'}`}
+            >
+              {tab === 'ad' ? t.tabAd : tab === 'label' ? t.tabLabel : t.tabBrand}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto text-slate-900">
+        {/* --- PAGE 1: CREATE AD --- */}
         {activeTab === 'ad' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom duration-500">
-            <div className="space-y-8 bg-white p-10 rounded-[3rem] border border-[#E8D9CF] shadow-sm">
-              <div className="flex justify-between items-center border-b border-[#FDF8F3] pb-6">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-black text-[#3E2723] uppercase">{t.subtitle}</h2>
-                  <p className="text-[#6F4E37]/50 text-xs font-bold">{t.desc}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white p-8 rounded-3xl border border-[#E8D9CF] shadow-sm space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest border-l-4 border-[#3E2723] pl-3">{t.tabAd}</h3>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-2 block">{t.stepImage}</label>
+                <div onClick={() => adFileInputRef.current?.click()} className="aspect-square bg-[#FDF8F3] border-2 border-dashed border-[#E8D9CF] rounded-2xl flex items-center justify-center cursor-pointer overflow-hidden relative group">
+                  {adConfig.image ? <img src={adConfig.image} className="w-full h-full object-cover" alt="Product" /> : <p className="text-[10px] font-black uppercase opacity-40">{t.clickToUpload}</p>}
                 </div>
-                <div className="px-5 py-2.5 bg-[#FDF8F3] rounded-full border border-[#E8D9CF]">
-                  <span className="text-[10px] font-black text-[#6F4E37] uppercase">{FREE_LIMIT - usageCount} {t.usageUnit} {t.usageLeft}</span>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold border border-red-100">{error}</div>}
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.stepCategory}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setConfig({...config, category: ProductCategory.PACKAGING})} className={`p-4 rounded-xl text-[10px] font-black uppercase border transition-all ${config.category === ProductCategory.PACKAGING ? 'bg-[#6F4E37] text-white border-transparent shadow-md' : 'bg-[#FDF8F3] text-[#6F4E37] border-[#E8D9CF]'}`}>
-                      {t.catPackaging}
-                    </button>
-                    <button onClick={() => setConfig({...config, category: ProductCategory.EQUIPMENT})} className={`p-4 rounded-xl text-[10px] font-black uppercase border transition-all ${config.category === ProductCategory.EQUIPMENT ? 'bg-[#6F4E37] text-white border-transparent shadow-md' : 'bg-[#FDF8F3] text-[#6F4E37] border-[#E8D9CF]'}`}>
-                      {t.catEquipment}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.stepObjective}</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { key: PostObjective.TASTE_QUALITY, label: t.objTaste },
-                      { key: PostObjective.NEW_ARRIVAL, label: t.objArrival },
-                      { key: PostObjective.ROASTERY_SKILL, label: t.objRoastery },
-                      { key: PostObjective.PROMOTION, label: t.objPromo },
-                    ].map((obj) => (
-                      <button key={obj.key} onClick={() => setConfig({...config, objective: obj.key})} className={`p-3 rounded-xl text-[10px] font-black uppercase border transition-all ${config.objective === obj.key ? 'bg-[#3E2723] text-white border-transparent' : 'bg-[#FDF8F3] text-[#6F4E37] border-[#E8D9CF]'}`}>
-                        {obj.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.stepImage}</label>
-                  <div className="border-2 border-dashed border-[#E8D9CF] rounded-[2rem] p-8 text-center cursor-pointer hover:bg-[#FDF8F3] transition-all relative overflow-hidden group" onClick={() => document.getElementById('ad-img')?.click()}>
-                    <input type="file" id="ad-img" className="hidden" accept="image/*" onChange={e => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        const r = new FileReader();
-                        r.onload = () => setConfig({...config, image: r.result as string});
-                        r.readAsDataURL(f);
-                      }
-                    }} />
-                    {config.image ? (
-                      <div className="relative">
-                        <img src={config.image} className="max-h-48 mx-auto rounded-xl shadow-lg border-4 border-white" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                           <span className="text-white text-[10px] font-black uppercase">เปลี่ยนรูปภาพ</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-6 flex flex-col items-center">
-                        <svg className="w-12 h-12 text-[#6F4E37]/20 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="1.5"/></svg>
-                        <p className="text-[#6F4E37] font-black text-[10px] uppercase tracking-widest">{t.clickToUpload}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                   <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.stepDetails}</label>
-                   <textarea className="w-full p-5 bg-[#FDF8F3] border-0 rounded-2xl min-h-[80px] font-bold text-sm focus:ring-2 focus:ring-[#6F4E37] outline-none" placeholder={config.category === ProductCategory.PACKAGING ? t.placeholderDetailsPackaging : t.placeholderDetailsEquipment} value={config.coffeeDetails} onChange={e => setConfig({...config, coffeeDetails: e.target.value})} />
-                </div>
-
-                <div className="space-y-3">
-                   <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.stepAtmosphere}</label>
-                   <textarea className="w-full p-5 bg-[#FDF8F3] border-0 rounded-2xl min-h-[80px] font-bold text-sm focus:ring-2 focus:ring-[#6F4E37] outline-none" placeholder={t.placeholderAtmosphere} value={config.atmosphere} onChange={e => setConfig({...config, atmosphere: e.target.value})} />
-                </div>
-
-                <button onClick={handleGenerateAd} disabled={isGenerating} className="w-full bg-[#3E2723] text-white py-6 rounded-2xl font-black text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all uppercase disabled:opacity-50">
-                  {isGenerating ? t.generating : t.generateBtn}
+                <input type="file" ref={adFileInputRef} hidden accept="image/*" onChange={e => handleImageUpload(e, (val) => setAdConfig({ ...adConfig, image: val }))} />
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.stepDetails}</label>
+                <textarea className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-xl outline-none text-sm font-medium h-32" placeholder={t.placeholderDetailsPackaging} value={adConfig.coffeeDetails} onChange={e => setAdConfig({...adConfig, coffeeDetails: e.target.value})} />
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.stepAtmosphere}</label>
+                <input className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-xl outline-none text-sm font-medium" placeholder={t.placeholderAtmosphere} value={adConfig.atmosphere} onChange={e => setAdConfig({...adConfig, atmosphere: e.target.value})} />
+                
+                <button disabled={loading} onClick={handleGenerateAd} className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center shadow-lg transition-transform active:scale-95">
+                  {loading ? <span className="animate-pulse">PROCESSING...</span> : t.generateBtn}
                 </button>
+                {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] font-bold uppercase rounded-xl border border-red-100">{error}</div>}
               </div>
             </div>
-
-            <div className="space-y-6">
-               <div className="aspect-square bg-white rounded-[4rem] border border-[#E8D9CF] flex flex-col items-center justify-center p-8 relative shadow-inner overflow-hidden">
-                  {result ? (
-                    <div className="w-full h-full flex flex-col items-center animate-in zoom-in duration-500">
-                      <img src={result.imageUrl} className="max-w-full max-h-[85%] object-contain rounded-3xl shadow-2xl mb-6" />
-                      <button 
-                        onClick={() => downloadImage(result.imageUrl, `coffee-ad-${Date.now()}.png`)} 
-                        className="flex items-center space-x-2 bg-white border border-[#E8D9CF] px-8 py-3 rounded-xl shadow-sm hover:bg-[#FDF8F3] active:scale-95 transition-all"
-                      >
-                        <svg className="w-4 h-4 text-[#3E2723]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5" strokeLinecap="round"/></svg>
-                        <span className="text-[10px] font-black text-[#3E2723] uppercase">{t.download}</span>
-                      </button>
+            
+            <div className="lg:col-span-3" ref={resultRef}>
+              <div className="bg-white rounded-3xl border border-[#E8D9CF] shadow-lg overflow-hidden min-h-[500px] p-6 space-y-6 text-center">
+                <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">Ad Preview Result</p>
+                {adResult ? (
+                  <div className="space-y-6 animate-in fade-in duration-700">
+                    <img src={adResult.imageUrl} className="w-full rounded-2xl shadow-xl border-4 border-white" alt="Generated Ad" />
+                    <div className="bg-[#FDF8F3] p-8 rounded-3xl border border-[#E8D9CF] text-left">
+                      <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-3 block border-b border-[#E8D9CF] pb-2">{t.captionTitle}</label>
+                      <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap text-slate-800">{adResult.caption}</p>
                     </div>
-                  ) : (
-                    <div className="text-center opacity-20 flex flex-col items-center">
-                      <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" strokeWidth="1.5"/></svg>
-                      <p className="font-black text-xs uppercase tracking-widest">Preview Area</p>
-                    </div>
-                  )}
-               </div>
-               {result?.caption && (
-                 <div className="bg-white p-8 rounded-[2.5rem] border border-[#E8D9CF] shadow-sm space-y-4 animate-in slide-in-from-top duration-300">
-                   <h3 className="text-[10px] font-black text-[#6F4E37] uppercase tracking-widest">{t.captionTitle}</h3>
-                   <div className="text-[#3E2723] italic font-bold leading-relaxed whitespace-pre-line text-sm">{result.caption}</div>
-                 </div>
-               )}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center opacity-10 py-40 font-black uppercase">
+                    <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <span>Result Space</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'brand' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom duration-500">
-            <div className="bg-white p-12 rounded-[3.5rem] border border-[#E8D9CF] shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-12">
-               <div className="space-y-8">
-                  <h2 className="text-3xl font-black text-[#3E2723] uppercase tracking-tighter">{t.tabBrand}</h2>
-                  
-                  <div className="space-y-4">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.selectBagColor}</label>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-4 bg-[#FDF8F3] p-8 rounded-[2.5rem] border border-[#E8D9CF]/50 shadow-inner">
-                      {Object.values(BagColor).map((color) => (
-                        <button key={color} onClick={() => setSelectedBagColor(color)}>
-                          <CoffeeBagIcon colorKey={color} isSelected={selectedBagColor === color} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">แนวคิดในการออกแบบแบรนด์</label>
-                    <textarea className="w-full p-8 bg-[#FDF8F3] border-0 rounded-[2rem] min-h-[150px] font-bold text-lg focus:ring-2 focus:ring-[#6F4E37] outline-none" placeholder={t.brandPlaceholder} value={brandConcept} onChange={e => setBrandConcept(e.target.value)} />
-                  </div>
-                  
-                  <button onClick={handleBrandIdentity} disabled={isBranding} className="w-full bg-[#3E2723] text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50">
-                    {isBranding ? t.generating : t.btnGenerateBrand}
-                  </button>
-                  
-                  <div className="p-8 bg-[#FDF8F3] rounded-[2.5rem] border border-[#E8D9CF] space-y-4">
-                     <h3 className="font-black text-[#6F4E37] uppercase text-xs tracking-widest">{t.printingService}</h3>
-                     <p className="text-xs font-bold text-[#3E2723]/60 leading-relaxed">{t.printingDesc}</p>
-                     <button onClick={() => window.open(`https://wa.me/${ADMIN_PHONE}`)} className="w-full bg-white text-[#3E2723] border border-[#E8D9CF] px-6 py-4 rounded-xl text-xs font-black shadow-sm active:scale-95 transition-all uppercase tracking-widest">
-                        {t.btnContactPrint}
-                     </button>
-                  </div>
-               </div>
-               <div className="space-y-6">
-                  {brandResult ? (
-                    <div className="space-y-6 animate-in zoom-in duration-500">
-                       <div className="relative group">
-                        <img src={brandResult.mockupImageUrl} className="w-full aspect-square object-cover rounded-[3rem] shadow-2xl border-8 border-white" />
-                        <button 
-                          onClick={() => downloadImage(brandResult.mockupImageUrl, `mockup-${Date.now()}.png`)}
-                          className="absolute bottom-6 right-6 bg-white/90 backdrop-blur p-4 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
-                        >
-                          <svg className="w-6 h-6 text-[#3E2723]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
-                        </button>
-                       </div>
-                       <div className="bg-white p-8 rounded-[2.5rem] border border-[#E8D9CF] shadow-sm space-y-6">
-                          <div>
-                            <h4 className="text-[10px] font-black text-[#6F4E37] uppercase tracking-widest mb-3">{t.brandNameIdeas}</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {brandResult.names.map((name, i) => <span key={i} className="px-5 py-3 bg-[#FDF8F3] rounded-xl text-sm font-black border border-[#E8D9CF] text-[#3E2723]">{name}</span>)}
-                            </div>
-                          </div>
-                          <div>
-                            <h4 className="text-[10px] font-black text-[#6F4E37] uppercase tracking-widest mb-2">{t.logoConcept}</h4>
-                            <p className="text-sm font-bold text-[#3E2723] italic leading-relaxed">"{brandResult.logoConcept}"</p>
-                          </div>
-                       </div>
-                    </div>
-                  ) : (
-                    <div className="h-full min-h-[450px] border-2 border-dashed border-[#E8D9CF] rounded-[3rem] flex flex-col items-center justify-center opacity-20 text-center p-8">
-                      <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17l.354-.354" strokeWidth="1.5"/></svg>
-                      <p className="font-black text-xs uppercase tracking-widest">การออกแบบจะแสดงที่นี่</p>
-                    </div>
-                  )}
-               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'calc' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom duration-500">
-            <div className="bg-white p-12 rounded-[3.5rem] border border-[#E8D9CF] shadow-sm grid grid-cols-1 lg:grid-cols-3 gap-12">
-              <div className="lg:col-span-2 space-y-8">
-                <h2 className="text-3xl font-black text-[#3E2723] uppercase tracking-tighter">{t.calcTitle}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.calcBeanPrice}</label>
-                    <input type="number" className="w-full p-6 bg-[#FDF8F3] border-0 rounded-2xl font-black text-xl text-[#3E2723] focus:ring-2 focus:ring-[#6F4E37] outline-none" value={beanPrice} onChange={e => setBeanPrice(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">ปริมาณสุทธิ (กรัม/ถุง)</label>
-                    <input type="number" className="w-full p-6 bg-[#FDF8F3] border-0 rounded-2xl font-black text-xl text-[#3E2723] focus:ring-2 focus:ring-[#6F4E37] outline-none" value={targetWeight} onChange={e => setTargetWeight(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">{t.calcPackaging}</label>
-                    <input type="number" className="w-full p-6 bg-[#FDF8F3] border-0 rounded-2xl font-black text-xl text-[#3E2723] focus:ring-2 focus:ring-[#6F4E37] outline-none" value={packagingCost} onChange={e => setPackagingCost(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black text-[#6F4E37]/40 uppercase tracking-widest">ค่าแรงและค่าใช้จ่ายอื่นๆ</label>
-                    <input type="number" className="w-full p-6 bg-[#FDF8F3] border-0 rounded-2xl font-black text-xl text-[#3E2723] focus:ring-2 focus:ring-[#6F4E37] outline-none" value={otherLabor} onChange={e => setOtherLabor(Number(e.target.value))} />
-                  </div>
+        {/* --- PAGE 2: DESIGN LABEL (LOGO ONLY) --- */}
+        {activeTab === 'label' && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white p-8 rounded-3xl border border-[#E8D9CF] shadow-sm space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest border-l-4 border-[#3E2723] pl-3">{t.tabLabel}</h3>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-2 block">{t.stepLogo}</label>
+                <div onClick={() => labelLogoInputRef.current?.click()} className="aspect-video bg-[#FDF8F3] border-2 border-dashed border-[#E8D9CF] rounded-xl flex items-center justify-center cursor-pointer overflow-hidden relative group">
+                  {labelLogo ? <img src={labelLogo} className="w-full h-full object-contain" alt="Logo" /> : <p className="text-[9px] font-black uppercase opacity-40">{t.clickToUpload}</p>}
                 </div>
+                <input type="file" ref={labelLogoInputRef} hidden accept="image/*" onChange={e => handleImageUpload(e, setLabelLogo)} />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setProdType('sticker')} className={`py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${prodType === 'sticker' ? 'bg-[#3E2723] text-white' : 'bg-[#FDF8F3] text-slate-400'}`}>{t.prodSticker}</button>
+                  <button onClick={() => setProdType('print')} className={`py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${prodType === 'print' ? 'bg-[#3E2723] text-white' : 'bg-[#FDF8F3] text-slate-400'}`}>{t.prodPrint}</button>
+                </div>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.labelShape}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['rect', 'square', 'circle'] as const).map(s => (
+                    <button key={s} onClick={() => setLabelShape(s)} className={`py-2 rounded-xl text-[9px] font-bold uppercase border transition-all ${labelShape === s ? 'bg-[#3E2723] text-white shadow-sm' : 'bg-[#FDF8F3] text-slate-400'}`}>
+                      {s === 'rect' ? t.shapeRect : s === 'square' ? t.shapeSquare : t.shapeCircle}
+                    </button>
+                  ))}
+                </div>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.selectBagColor}</label>
+                <select className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-xl text-xs font-bold" value={selectedBagColor} onChange={e => setSelectedBagColor(e.target.value as BagColor)}>
+                  {Object.values(BagColor).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.styleLabel}</label>
+                <textarea className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-xl outline-none text-sm font-medium h-32" placeholder={t.brandPlaceholder} value={labelConcept} onChange={e => setLabelConcept(e.target.value)} />
+                
+                <button disabled={loading} onClick={handleGenerateLabel} className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center shadow-lg hover:bg-[#2d1b19] transition-colors">
+                  {loading ? <span className="animate-pulse">PROCESSING...</span> : t.btnGenerateLabel}
+                </button>
+                {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] font-bold uppercase rounded-xl border border-red-100">{error}</div>}
               </div>
-              <div className="bg-[#3E2723] rounded-[3rem] p-12 text-white flex flex-col justify-center items-center shadow-2xl border-4 border-[#6F4E37]">
-                 <p className="text-[11px] font-black opacity-40 uppercase tracking-[0.3em] mb-6">{t.calcResult}</p>
-                 <div className="text-center">
-                  <p className="text-7xl font-black mb-2">{costPerUnit.toLocaleString(undefined, { maximumFractionDigits: 1 })}</p>
-                  <p className="text-xs font-bold opacity-60 uppercase tracking-widest">THB / UNIT</p>
-                 </div>
+            </div>
+            
+            <div className="lg:col-span-3" ref={resultRef}>
+               <div className="bg-white rounded-3xl border border-[#E8D9CF] shadow-lg p-6 min-h-[500px] flex flex-col items-center justify-center text-center">
+                 {labelImageUrl ? (
+                   <img src={labelImageUrl} className="w-full rounded-2xl shadow-2xl border-4 border-white animate-in zoom-in duration-500" alt="Label Preview" />
+                 ) : (
+                   <div className="py-40 opacity-10 font-black uppercase flex flex-col items-center">
+                     <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                     <span>Label Preview Space</span>
+                   </div>
+                 )}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- PAGE 3: CREATE LOGO/BRAND --- */}
+        {activeTab === 'brand' && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white p-8 rounded-3xl border border-[#E8D9CF] shadow-sm space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest border-l-4 border-[#3E2723] pl-3">{t.tabBrand}</h3>
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.brandNameLabel}</label>
+                <input className="w-full p-4 bg-[#FDF8F3] border border-[#E8D9CF] rounded-xl outline-none text-sm font-medium" placeholder="เช่น COFFEE PLEASE" value={brandNameInput} onChange={e => setBrandNameInput(e.target.value)} />
+                
+                <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-1 block">{t.brandPlaceholder}</label>
+                <textarea className="w-full p-5 bg-[#FDF8F3] border border-[#E8D9CF] rounded-2xl outline-none text-sm font-medium h-40" placeholder="เช่น สไตล์มินิมอล เน้นโทนสีครีมและน้ำตาลไม้" value={brandStyleInput} onChange={e => setBrandStyleInput(e.target.value)} />
+                
+                <button disabled={loading} onClick={handleGenerateBrand} className="w-full bg-[#3E2723] text-white py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center shadow-lg hover:bg-[#2d1b19] transition-colors">
+                  {loading ? <span className="animate-pulse">ANALYZING...</span> : t.btnGenerateBrand}
+                </button>
+                {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] font-bold uppercase rounded-xl border border-red-100">{error}</div>}
+              </div>
+            </div>
+            
+            <div className="lg:col-span-3" ref={resultRef}>
+              <div className="bg-white rounded-3xl border border-[#E8D9CF] shadow-lg p-8 min-h-[500px] flex flex-col justify-center space-y-8">
+                {brandStrategy ? (
+                  <div className="space-y-8 animate-in slide-in-from-bottom duration-500 text-left">
+                    <div className="flex flex-wrap gap-2">
+                      {brandStrategy.names.map((n: string) => <span key={n} className="px-4 py-2 bg-[#FDF8F3] border border-[#E8D9CF] rounded-full text-[10px] font-black text-[#3E2723] uppercase shadow-sm">{n}</span>)}
+                    </div>
+                    <div className="p-6 bg-[#FDF8F3] rounded-2xl border border-[#E8D9CF]">
+                      <label className="text-[10px] font-black uppercase text-[#8D3B24] mb-4 block border-b border-[#E8D9CF] pb-2">{t.logoConcept}</label>
+                      <p className="text-sm font-medium italic leading-relaxed text-slate-700">{brandStrategy.logoConcept}</p>
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t.colorPalette}</label>
+                      <div className="flex gap-6">
+                        {brandStrategy.colors?.map((c: string) => (
+                          <div key={c} className="flex flex-col items-center gap-3 group">
+                            <div className="w-16 h-16 rounded-2xl shadow-md border-4 border-white transition-transform group-hover:scale-110" style={{ backgroundColor: c }}></div>
+                            <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-40 opacity-10 text-center font-black uppercase flex flex-col items-center">
+                    <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                    <span>Brand Strategy Identity Space</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -9,51 +9,63 @@ interface LayoutProps {
   onOpenKey: () => void;
 }
 
+const LOGO_SRC = "logo.png";
+const FALLBACK_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233E2723'%3E%3Cpath d='M2 21h18v-2H2M20 8h-2V5h2m0-2H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z'/%3E%3C/svg%3E";
+
 export const Layout: React.FC<LayoutProps> = ({ children, lang, setLang, onOpenKey }) => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FDF8F3]">
-      <header className="bg-white border-b border-[#E8D9CF] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <div 
-            className="flex items-center space-x-3 cursor-pointer select-none active:scale-95 transition-transform"
-            onClick={onOpenKey}
-          >
-            <div className="w-10 h-10 bg-[#6F4E37] rounded-xl flex items-center justify-center shadow-lg shadow-[#6F4E37]/20">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+    <div className="min-h-screen bg-[#FDF8F3] font-sans text-[#3E2723]">
+      <nav className="bg-white border-b border-[#E8D9CF] sticky top-0 z-50 h-16 flex items-center shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 w-full flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-[#FDF8F3] rounded-lg overflow-hidden border border-[#E8D9CF] flex items-center justify-center">
+              <img 
+                src={LOGO_SRC} 
+                alt="Coffee Please" 
+                className="w-full h-full object-contain"
+                onError={(e) => e.currentTarget.src = FALLBACK_SVG} 
+              />
             </div>
-            <div>
-              <h1 className="text-xl font-extrabold text-[#3E2723] leading-none tracking-tight">COFFEE PLEASE</h1>
-              <p className="text-[10px] font-bold text-[#6F4E37] opacity-60 uppercase tracking-widest mt-0.5">Premium Equipment</p>
+            <div className="hidden sm:block">
+              <h1 className="text-sm font-black tracking-tight uppercase leading-none">Coffee Please</h1>
+              <p className="text-[8px] font-bold text-[#8D3B24] uppercase tracking-[0.2em] mt-0.5">Partner System</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="flex bg-[#FDF8F3] p-1 rounded-xl border border-[#E8D9CF]">
+            <div className="flex bg-[#FDF8F3] p-0.5 rounded-lg border border-[#E8D9CF]">
               <button 
-                onClick={() => setLang('th')}
-                className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${lang === 'th' ? 'bg-[#6F4E37] shadow-sm text-white' : 'text-[#6F4E37]/40'}`}
+                onClick={() => setLang('th')} 
+                className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${lang === 'th' ? 'bg-[#3E2723] text-white' : 'text-[#6F4E37]/50 hover:text-[#3E2723]'}`}
               >
                 TH
               </button>
               <button 
-                onClick={() => setLang('lo')}
-                className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${lang === 'lo' ? 'bg-[#6F4E37] shadow-sm text-white' : 'text-[#6F4E37]/40'}`}
+                onClick={() => setLang('lo')} 
+                className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${lang === 'lo' ? 'bg-[#3E2723] text-white' : 'text-[#6F4E37]/50 hover:text-[#3E2723]'}`}
               >
                 LO
               </button>
             </div>
+            <button 
+              onClick={onOpenKey} 
+              className="p-1.5 text-[#3E2723] hover:bg-[#FDF8F3] rounded-lg border border-[#E8D9CF] shadow-sm transition-colors"
+              title="API Key"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
           </div>
         </div>
-      </header>
-
-      <main className="flex-grow">
+      </nav>
+      <main className="max-w-6xl mx-auto px-4 py-8 min-h-[calc(100vh-130px)]">
         {children}
       </main>
-
-      <footer className="bg-white border-t border-[#E8D9CF] py-8 mt-12 text-center px-4">
-        <p className="text-sm font-bold text-[#3E2723]/40">© 2024 COFFEE PLEASE. ☕ ອຸປະກອນກາເຟ ແລະ ຖົງບັນຈຸ.</p>
+      <footer className="py-8 text-center border-t border-[#E8D9CF]">
+        <p className="text-[9px] font-bold text-[#6F4E37]/30 uppercase tracking-[0.2em]">
+          &copy; {new Date().getFullYear()} Coffee Please Systems. All rights reserved.
+        </p>
       </footer>
     </div>
   );
