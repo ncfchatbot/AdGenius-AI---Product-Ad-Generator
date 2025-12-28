@@ -13,28 +13,48 @@ const FALLBACK_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/sv
 
 export const Layout: React.FC<LayoutProps> = ({ children, lang, setLang, onOpenKey }) => {
   return (
-    <div className="min-h-screen">
-      <nav className="bg-white border-b border-[#E8D9CF] sticky top-0 z-50 h-16 flex items-center shadow-sm">
+    <div className="min-h-screen bg-[#FDF8F3] text-[#3E2723]">
+      <nav className="bg-white/80 backdrop-blur-md border-b border-[#E8D9CF] sticky top-0 z-50 h-16 flex items-center shadow-sm">
         <div className="max-w-6xl mx-auto px-4 w-full flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-[#FDF8F3] rounded-lg overflow-hidden border border-[#E8D9CF] flex items-center justify-center">
-              <img src={LOGO_SRC} alt="Logo" className="w-full h-full object-contain" onError={(e) => e.currentTarget.src = FALLBACK_SVG} />
+            <img 
+              src={LOGO_SRC} 
+              className="w-8 h-8 object-contain" 
+              onError={(e) => e.currentTarget.src = FALLBACK_SVG} 
+            />
+            <div className="leading-none">
+              <h1 className="text-sm font-black uppercase tracking-tight">Coffee Please</h1>
+              <p className="text-[8px] font-bold text-[#8D3B24] uppercase tracking-widest">Partner AI</p>
             </div>
-            <h1 className="text-sm font-black uppercase tracking-tight hidden sm:block">Coffee Please</h1>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="flex bg-[#FDF8F3] p-0.5 rounded-lg border border-[#E8D9CF]">
+            <div className="flex bg-[#FDF8F3] p-1 rounded-xl border border-[#E8D9CF]">
               {(['th', 'lo'] as const).map(l => (
-                <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${lang === l ? 'bg-[#3E2723] text-white' : 'text-[#6F4E37]/50'}`}>{l}</button>
+                <button 
+                  key={l} 
+                  onClick={() => setLang(l)} 
+                  className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${lang === l ? 'bg-[#3E2723] text-white shadow-md' : 'text-[#6F4E37]/50 hover:text-[#3E2723]'}`}
+                >
+                  {l}
+                </button>
               ))}
             </div>
-            <button onClick={onOpenKey} className="p-2 border border-[#E8D9CF] rounded-lg hover:bg-[#FDF8F3]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <button 
+              onClick={onOpenKey} 
+              className="p-2 border border-[#E8D9CF] rounded-xl hover:bg-[#FDF8F3] transition-colors"
+              title="Set API Key"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
             </button>
           </div>
         </div>
       </nav>
       <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+      <footer className="py-8 text-center opacity-20 text-[9px] font-bold uppercase tracking-[0.3em]">
+        Coffee Please Partner System &copy; {new Date().getFullYear()}
+      </footer>
     </div>
   );
 };

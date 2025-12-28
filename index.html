@@ -7,13 +7,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    // 🛑 ป้องกันอาการจอขาว: สร้างตัวแปร process จำลองก่อนที่โมดูลอื่นจะทำงาน
-    window.process = { env: { API_KEY: "" } };
+    // 🛑 ป้องกัน "process is not defined" ที่เป็นสาเหตุหลักของจอขาว
+    window.process = window.process || { env: { API_KEY: "" } };
   </script>
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FDF8F3; }
     .animate-spin-slow { animation: spin 3s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
   </style>
   <script type="importmap">
 {
@@ -22,13 +24,14 @@
     "react-dom": "https://esm.sh/react-dom@19.2.3",
     "react-dom/client": "https://esm.sh/react-dom@19.2.3/client",
     "@google/genai": "https://esm.sh/@google/genai@1.34.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
 <body>
   <div id="root"></div>
+  <!-- 🟢 ไฟล์ index.tsx จะถูกโหลดโดยอัตโนมัติจากระบบ -->
 </body>
 </html>

@@ -2,31 +2,25 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AdConfiguration, BrandIdentityOutput } from "./types.ts";
 import { Language } from "./translations.ts";
 
-const getAIClient = () => {
-  // สร้าง instance ใหม่ทุกครั้งเพื่อให้ได้ API Key ล่าสุดจากระบบ
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
-};
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateProductAd = async (config: AdConfiguration, lang: Language): Promise<{imageUrl: string, caption: string}> => {
-  if (!config.image) throw new Error("Please upload a product image.");
+  if (!config.image) throw new Error("Please upload a product photo.");
   
-  const ai = getAIClient();
-  const base64Data = config.image.split(',')[1];
-  const mimeType = config.image.split(';')[0].split(':')[1];
-  const langName = lang === 'th' ? 'Thai' : 'Lao';
-
-  const imagePrompt = `ULTRA-PHOTOREALISTIC high-end commercial product advertisement for coffee. 
-    Product image is provided. Context: ${config.atmosphere}. 
-    Atmosphere Details: ${config.coffeeDetails}.
-    Style: Professional studio lighting, 8k resolution, sharp focus, cinematic.
-    NO TEXT ON IMAGE. NO AI ARTIFACTS.`;
-
-  const imageResponse = await ai.models.generateContent({
+  const ai = getAI();
+  const base64 = config.image.split(',')[1];
+  const mime = config.image.split(';')[0].split(':')[1];
+  
+  // 📸 สร้างรูปภาพด้วย Gemini 3 Pro Image (High Quality)
+  const imgRes = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
     contents: {
       parts: [
-        { inlineData: { data: base64Data, mimeType: mimeType } },
-        { text: imagePrompt }
+        { inlineData: { data: base64, mimeType: mime } },
+        { text: `ULTRA-REALISTIC premium commercial product photography. 
+                 Context: ${config.atmosphere}. Details: ${config.coffeeDetails}. 
+                 Style: High-end studio lighting, sharp focus, cinematic depth of field. 
+                 NO TEXT ON IMAGE. 8K resolution.` }
       ],
     },
     config: {
@@ -38,75 +32,53 @@ export const generateProductAd = async (config: AdConfiguration, lang: Language)
   });
 
   let imageUrl = '';
-  if (imageResponse.candidates?.[0]?.content?.parts) {
-    for (const part of imageResponse.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
-      }
+  const parts = imgRes.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    if (part.inlineData) {
+      imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+      break;
     }
   }
 
-  if (!imageUrl) throw new Error("Failed to generate image. Please check your API key.");
+  if (!imageUrl) throw new Error("Failed to generate image. Please check if your API Key is from a paid project.");
 
-  const textPrompt = `Write a premium social media caption in ${langName} for ${config.platform}. 
-    Product details: ${config.coffeeDetails}. Use professional and inviting tone. 
-    For Lao: Follow modern official spelling strictly.`;
-
-  const textResponse = await ai.models.generateContent({
+  // ✍️ สร้างแคปชัน
+  const textRes = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: textPrompt,
+    contents: `Write a premium social media caption for ${config.platform} about coffee: ${config.coffeeDetails}. 
+               Language: ${lang === 'th' ? 'Thai' : 'Lao'}. 
+               Tone: Professional and inviting. For Lao, use modern official spelling.`,
   });
 
-  return {
-    imageUrl: imageUrl,
-    caption: textResponse.text || ""
-  };
+  return { imageUrl, caption: textRes.text || "" };
 };
 
-export const generateLabelDesign = async (
-  concept: string, 
-  shape: string, 
-  bagColor: string, 
-  type: string, 
-  lang: Language,
-  logoImage?: string | null
-): Promise<{imageUrl: string}> => {
-  const ai = getAIClient();
+export const generateLabelDesign = async (concept: string, shape: string, bagColor: string, type: string, lang: Language, logo?: string | null): Promise<{imageUrl: string}> => {
+  const ai = getAI();
   const parts: any[] = [];
-  if (logoImage) {
-    parts.push({
-      inlineData: {
-        data: logoImage.split(',')[1],
-        mimeType: logoImage.split(';')[0].split(':')[1]
-      }
-    });
+  if (logo) {
+    parts.push({ inlineData: { data: logo.split(',')[1], mimeType: logo.split(';')[0].split(':')[1] } });
   }
-  parts.push({ text: `Create a professional 3D mockup of a coffee bag. Color: ${bagColor}. Label Shape: ${shape}. Application Type: ${type}. Style: ${concept}. High resolution, studio lighting.` });
+  parts.push({ text: `3D Mockup of a coffee bag. Color: ${bagColor}. Label Shape: ${shape}. Style: ${concept}. Hyper-realistic studio render.` });
 
-  const response = await ai.models.generateContent({
+  const res = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
     contents: { parts },
     config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
   });
 
   let imageUrl = '';
-  if (response.candidates?.[0]?.content?.parts) {
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
-      }
-    }
+  for (const part of (res.candidates?.[0]?.content?.parts || [])) {
+    if (part.inlineData) { imageUrl = `data:image/png;base64,${part.inlineData.data}`; break; }
   }
   return { imageUrl };
 };
 
 export const generateBrandStrategy = async (brandName: string, concept: string, lang: Language): Promise<BrandIdentityOutput> => {
-  const ai = getAIClient();
-  const response = await ai.models.generateContent({
+  const ai = getAI();
+  const res = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `Act as a branding expert. Provide 5 brand names, a logo concept, and 3 colors (HEX) for: ${brandName} with style: ${concept}. Output in ${lang === 'th' ? 'Thai' : 'Lao'}.`,
+    contents: `Act as a brand expert. Suggest 5 names, a logo concept, and 3 HEX colors for: ${brandName} (${concept}). Language: ${lang === 'th' ? 'Thai' : 'Lao'}.`,
     config: {
       responseMimeType: 'application/json',
       responseSchema: {
@@ -120,6 +92,5 @@ export const generateBrandStrategy = async (brandName: string, concept: string, 
       }
     }
   });
-  const data = JSON.parse(response.text || '{}');
-  return { ...data, mockupImageUrl: '' };
+  return { ...JSON.parse(res.text || '{}'), mockupImageUrl: '' };
 };
